@@ -3,19 +3,19 @@ package zkv
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/json"
+	"encoding/gob"
 	"io"
 	"io/ioutil"
 )
 
 func encode(value interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := json.NewEncoder(buf).Encode(value)
+	err := gob.NewEncoder(buf).Encode(value)
 	return buf.Bytes(), err
 }
 
 func decode(b []byte, value interface{}) error {
-	return json.NewDecoder(bytes.NewReader(b)).Decode(&value)
+	return gob.NewDecoder(bytes.NewReader(b)).Decode(value)
 }
 
 func hashInterface(value interface{}) ([]byte, error) {

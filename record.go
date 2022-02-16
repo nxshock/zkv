@@ -3,7 +3,7 @@ package zkv
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
+	"encoding/gob"
 	"io"
 )
 
@@ -44,7 +44,7 @@ func newRecord(recordType RecordType, key, value interface{}) (*Record, error) {
 func (r *Record) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	err := json.NewEncoder(buf).Encode(r)
+	err := gob.NewEncoder(buf).Encode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func readRecord(r io.Reader) (n int64, record *Record, err error) {
 		return 0, nil, err // TODO: вместо нуля должно быть реальное кол-во считанных байт
 	}
 
-	err = json.NewDecoder(bytes.NewReader(recordBytes)).Decode(&record)
+	err = gob.NewDecoder(bytes.NewReader(recordBytes)).Decode(&record)
 	if err != nil {
 		return 0, nil, err // TODO: вместо нуля должно быть реальное кол-во считанных байт
 	}
