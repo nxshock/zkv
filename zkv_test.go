@@ -1,4 +1,4 @@
-package zkv2
+package zkv
 
 import (
 	"os"
