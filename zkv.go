@@ -32,11 +32,7 @@ func (db *Database) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	err := db.compressor.Flush()
-	if err != nil {
-		return err
-	}
-	err = db.compressor.Close()
+	err := db.compressor.Close()
 	if err != nil {
 		return err
 	}
