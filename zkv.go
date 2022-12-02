@@ -3,7 +3,6 @@ package zkv
 import (
 	"bytes"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,18 +11,12 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-type Options struct {
-	SaveKeys bool
-}
-
 type Database struct {
 	dataOffset map[string]int64
 	file       *os.File
 	compressor *zstd.Encoder
 	filePath   string
 	offset     int64
-
-	options Options
 
 	mu sync.Mutex
 }
@@ -47,10 +40,6 @@ func (db *Database) Set(key, value interface{}) error {
 	record, err := newRecord(RecordTypeSet, key, value)
 	if err != nil {
 		return err
-	}
-
-	if !db.options.SaveKeys {
-		record.KeyBytes = nil
 	}
 
 	b, err := record.Marshal()
@@ -81,7 +70,7 @@ func (db *Database) Get(key, value interface{}) error {
 
 	offset, exists := db.dataOffset[string(hashToFind)]
 	if !exists {
-		return errors.New("not exists") // TODO: заменить на константную ошибку
+		return ErrNotExists
 	}
 
 	readF, err := os.Open(db.filePath)
@@ -106,7 +95,7 @@ func (db *Database) Get(key, value interface{}) error {
 		return err
 	}
 
-	if bytes.Compare(record.KeyHash, hashToFind) != 0 {
+	if !bytes.Equal(record.KeyHash, hashToFind) {
 		return fmt.Errorf("wrong hash on this offset: expected %s, got %s", base64.StdEncoding.EncodeToString(hashToFind), base64.StdEncoding.EncodeToString(record.KeyHash)) // TODO: заменить на константную ошибку
 	}
 
@@ -167,4 +156,35 @@ func Open(filePath string) (*Database, error) {
 	}
 
 	return database, nil
+}
+
+func (db *Database) Delete(key interface{}) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	keyHash, err := hashInterface(key)
+	if err != nil {
+		return err
+	}
+
+	record := &Record{
+		Type:    RecordTypeDelete,
+		KeyHash: keyHash,
+	}
+
+	b, err := record.Marshal()
+	if err != nil {
+		return err
+	}
+
+	delete(db.dataOffset, string(record.KeyHash))
+
+	_, err = db.compressor.Write(b)
+	if err != nil {
+		return err
+	}
+
+	db.offset += int64(len(b))
+
+	return nil
 }

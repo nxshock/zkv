@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"io"
-	"io/ioutil"
 )
 
 func encode(value interface{}) ([]byte, error) {
@@ -39,7 +38,7 @@ func skip(r io.Reader, count int64) (err error) {
 	case io.Seeker:
 		_, err = r.Seek(count, io.SeekCurrent)
 	default:
-		_, err = io.CopyN(ioutil.Discard, r, count)
+		_, err = io.CopyN(io.Discard, r, count)
 	}
 
 	return err

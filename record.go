@@ -15,10 +15,9 @@ const (
 )
 
 type Record struct {
-	Type       RecordType `json:"t"`
-	KeyHash    []byte     `json:"h"`
-	KeyBytes   []byte     `json:"k,omitempty"` // optional
-	ValueBytes []byte     `json:"v"`
+	Type       RecordType
+	KeyHash    []byte
+	ValueBytes []byte
 }
 
 func newRecord(recordType RecordType, key, value interface{}) (*Record, error) {
@@ -35,7 +34,6 @@ func newRecord(recordType RecordType, key, value interface{}) (*Record, error) {
 	record := &Record{
 		Type:       recordType,
 		KeyHash:    hashBytes(keyBytes),
-		KeyBytes:   keyBytes,
 		ValueBytes: valueBytes}
 
 	return record, nil
