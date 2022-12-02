@@ -17,20 +17,17 @@ func decode(b []byte, value interface{}) error {
 	return gob.NewDecoder(bytes.NewReader(b)).Decode(value)
 }
 
-func hashInterface(value interface{}) ([]byte, error) {
+func hashInterface(value interface{}) ([sha256.Size224]byte, error) {
 	valueBytes, err := encode(value)
 	if err != nil {
-		return nil, err
+		return [sha256.Size224]byte{}, err
 	}
 
 	return hashBytes(valueBytes), nil
 }
 
-func hashBytes(b []byte) []byte {
-	bytes := sha256.Sum224(b)
-
-	return bytes[:]
-
+func hashBytes(b []byte) [sha256.Size224]byte {
+	return sha256.Sum224(b)
 }
 
 func skip(r io.Reader, count int64) (err error) {

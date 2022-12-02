@@ -47,7 +47,7 @@ func (db *Database) Set(key, value interface{}) error {
 		return err
 	}
 
-	db.dataOffset[string(record.KeyHash)] = db.offset // TODO: удалить хеш и откатить запись в случае ошибки
+	db.dataOffset[string(record.KeyHash[:])] = db.offset // TODO: удалить хеш и откатить запись в случае ошибки
 
 	_, err = db.compressor.Write(b)
 	if err != nil {
@@ -68,7 +68,7 @@ func (db *Database) Get(key, value interface{}) error {
 		return err
 	}
 
-	offset, exists := db.dataOffset[string(hashToFind)]
+	offset, exists := db.dataOffset[string(hashToFind[:])]
 	if !exists {
 		return ErrNotExists
 	}
@@ -95,8 +95,8 @@ func (db *Database) Get(key, value interface{}) error {
 		return err
 	}
 
-	if !bytes.Equal(record.KeyHash, hashToFind) {
-		return fmt.Errorf("wrong hash on this offset: expected %s, got %s", base64.StdEncoding.EncodeToString(hashToFind), base64.StdEncoding.EncodeToString(record.KeyHash)) // TODO: заменить на константную ошибку
+	if !bytes.Equal(record.KeyHash[:], hashToFind[:]) {
+		return fmt.Errorf("wrong hash on this offset: expected %s, got %s", base64.StdEncoding.EncodeToString(hashToFind[:]), base64.StdEncoding.EncodeToString(record.KeyHash[:])) // TODO: заменить на константную ошибку
 	}
 
 	return decode(record.ValueBytes, value)
@@ -147,9 +147,9 @@ func Open(filePath string) (*Database, error) {
 
 		switch record.Type {
 		case RecordTypeSet:
-			database.dataOffset[string(record.KeyHash)] = offset
+			database.dataOffset[string(record.KeyHash[:])] = offset
 		case RecordTypeDelete:
-			delete(database.dataOffset, string(record.KeyHash))
+			delete(database.dataOffset, string(record.KeyHash[:]))
 		}
 
 		offset += n
@@ -177,7 +177,7 @@ func (db *Database) Delete(key interface{}) error {
 		return err
 	}
 
-	delete(db.dataOffset, string(record.KeyHash))
+	delete(db.dataOffset, string(record.KeyHash[:]))
 
 	_, err = db.compressor.Write(b)
 	if err != nil {

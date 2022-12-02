@@ -16,7 +16,7 @@ const (
 
 type Record struct {
 	Type       RecordType
-	KeyHash    []byte
+	KeyHash    [28]byte
 	ValueBytes []byte
 }
 
