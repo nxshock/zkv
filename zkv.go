@@ -18,7 +18,7 @@ type Database struct {
 	filePath   string
 	offset     int64
 
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 func (db *Database) Close() error {
@@ -60,8 +60,8 @@ func (db *Database) Set(key, value interface{}) error {
 }
 
 func (db *Database) Get(key, value interface{}) error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	hashToFind, err := hashInterface(key)
 	if err != nil {
