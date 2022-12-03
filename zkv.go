@@ -18,6 +18,10 @@ type Database struct {
 	filePath   string
 	offset     int64
 
+	options Options
+
+	readOrderChan chan struct{}
+
 	mu sync.RWMutex
 }
 
@@ -63,6 +67,9 @@ func (db *Database) Get(key, value interface{}) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
+	db.readOrderChan <- struct{}{}
+	defer func() { <-db.readOrderChan }()
+
 	hashToFind, err := hashInterface(key)
 	if err != nil {
 		return err
@@ -102,23 +109,31 @@ func (db *Database) Get(key, value interface{}) error {
 	return decode(record.ValueBytes, value)
 }
 
-func Open(filePath string) (*Database, error) {
+func OpenWithOptions(filePath string, options Options) (*Database, error) {
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		f.Close()
 		return nil, fmt.Errorf("ошибка при открытии файла для записи: %v", err)
+	}
+
+	if options.Validate() != nil {
+		return nil, err
 	}
 
 	compressor, err := zstd.NewWriter(f)
 	if err != nil {
+		f.Close()
 		return nil, fmt.Errorf("ошибка при инициализации компрессора: %v", err)
 	}
 
 	database := &Database{
-		dataOffset: make(map[string]int64),
-		offset:     0,
-		file:       f,
-		compressor: compressor,
-		filePath:   filePath}
+		dataOffset:    make(map[string]int64),
+		offset:        0,
+		file:          f,
+		compressor:    compressor,
+		filePath:      filePath,
+		options:       options,
+		readOrderChan: make(chan struct{}, int(options.MaxParallelReads))}
 
 	// restore file data
 	readF, err := os.Open(filePath)
@@ -130,6 +145,7 @@ func Open(filePath string) (*Database, error) {
 
 	decompressor, err := zstd.NewReader(readF)
 	if err != nil {
+		f.Close()
 		return nil, fmt.Errorf("ошибка при инициализации декомпрессора: %v", err)
 	}
 	defer decompressor.Close()
@@ -156,6 +172,10 @@ func Open(filePath string) (*Database, error) {
 	}
 
 	return database, nil
+}
+
+func Open(filePath string) (*Database, error) {
+	return OpenWithOptions(filePath, defaultOptions)
 }
 
 func (db *Database) Delete(key interface{}) error {
