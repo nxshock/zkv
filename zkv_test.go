@@ -20,7 +20,16 @@ func TestReadWriteBasic(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	assert.Len(t, db.dataOffset, recordCount)
+	assert.Len(t, db.dataOffset, 0)
+	assert.Len(t, db.bufferDataOffset, recordCount)
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
 
 	err = db.Close()
 	assert.NoError(t, err)
@@ -91,12 +100,15 @@ func TestDeleteBasic(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	assert.Len(t, db.dataOffset, recordCount)
+	assert.Len(t, db.dataOffset, 0)
+	assert.Len(t, db.bufferDataOffset, recordCount)
 
 	err = db.Delete(50)
 	assert.NoError(t, err)
 
-	assert.Len(t, db.dataOffset, recordCount-1)
+	assert.Len(t, db.dataOffset, 0)
+	assert.Len(t, db.bufferDataOffset, recordCount-1)
+
 	var value int
 	err = db.Get(50, &value)
 	assert.Equal(t, 0, value)
@@ -110,6 +122,8 @@ func TestDeleteBasic(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Len(t, db.dataOffset, recordCount-1)
+	assert.Len(t, db.bufferDataOffset, 0)
+
 	value = 0
 	err = db.Get(50, &value)
 	assert.Equal(t, 0, value)
@@ -117,4 +131,79 @@ func TestDeleteBasic(t *testing.T) {
 
 	err = db.Close()
 	assert.NoError(t, err)
+}
+
+func TestBufferBasic(t *testing.T) {
+	const filePath = "TestBuffer.zkv"
+	defer os.Remove(filePath)
+
+	db, err := OpenWithOptions(filePath, Options{BufferSize: 100})
+	assert.NoError(t, err)
+
+	err = db.Set(1, make([]byte, 100))
+	assert.NoError(t, err)
+
+	assert.NotEqual(t, 0, db.dataOffset)
+	assert.Len(t, db.bufferDataOffset, 0)
+	assert.Equal(t, 0, db.buffer.Len())
+
+	var gotValue []byte
+	err = db.Get(1, &gotValue)
+	assert.NoError(t, err)
+
+	assert.Equal(t, make([]byte, 100), gotValue)
+
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
+func TestBufferRead(t *testing.T) {
+	const filePath = "TestBufferRead.zkv"
+	const recordCount = 100
+	defer os.Remove(filePath)
+
+	db, err := OpenWithOptions(filePath, Options{BufferSize: 100})
+	assert.NoError(t, err)
+
+	for i := 1; i <= recordCount; i++ {
+		err = db.Set(i, i)
+		assert.NoError(t, err)
+	}
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
+
+	err = db.Close()
+	assert.NoError(t, err)
+
+	// try to read
+	db, err = Open(filePath)
+	assert.NoError(t, err)
+
+	assert.Len(t, db.dataOffset, recordCount)
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
+
+	err = db.Close()
+	assert.NoError(t, err)
+
 }

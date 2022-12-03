@@ -4,10 +4,13 @@ import "github.com/klauspost/compress/zstd"
 
 type Options struct {
 	// Maximum number of concurrent reads
-	MaxParallelReads uint
+	MaxParallelReads int
 
 	// Compression level
 	CompressionLevel zstd.EncoderLevel
+
+	// Write buffer size in bytes
+	BufferSize int
 }
 
 func (o *Options) setDefaults() {

@@ -1,8 +1,13 @@
 package zkv
 
-import "github.com/klauspost/compress/zstd"
+import (
+	"runtime"
+
+	"github.com/klauspost/compress/zstd"
+)
 
 var defaultOptions = Options{
-	MaxParallelReads: 64,
+	MaxParallelReads: runtime.NumCPU(),
 	CompressionLevel: zstd.SpeedDefault,
+	BufferSize:       4 * 1024 * 1024,
 }
