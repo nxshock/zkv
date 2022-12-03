@@ -31,10 +31,17 @@ err = db.Set(key, value) // key and value can be any of type
 
 // Read data
 var value ValueType
-err = db.Get(key)
+err = db.Get(key, &value)
 
 // Delete data
 err = db.Delete(key)
+```
+
+Other methods:
+
+```go
+// Flush data to disk
+err = db.Flush()
 ```
 
 ## File structure
