@@ -4,8 +4,8 @@ Simple key-value store for single-user applications.
 
 ## Pros
 
-* Simple file structure
-* Internal compression
+* Simple one file structure
+* Internal Zstandard compression by [klauspost/compress/zstd](https://github.com/klauspost/compress/tree/master/zstd)
 * Threadsafe operations through `sync.RWMutex`
 
 ## Cons
