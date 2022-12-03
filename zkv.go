@@ -110,14 +110,12 @@ func (db *Database) Get(key, value interface{}) error {
 }
 
 func OpenWithOptions(filePath string, options Options) (*Database, error) {
+	options.setDefaults()
+
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("ошибка при открытии файла для записи: %v", err)
-	}
-
-	if options.Validate() != nil {
-		return nil, err
 	}
 
 	compressor, err := zstd.NewWriter(f)
