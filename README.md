@@ -60,3 +60,9 @@ File is log stuctured list of commands:
 | -------| ------------------------ | -------- |
 | Length | Record body bytes length | int64    |
 | Body   | Gob-encoded record       | variable |
+
+## TODO
+
+- [ ] Implement `Copy()` method to copy store without deleted records
+- [ ] Test [seekable zstd streams](https://github.com/SaveTheRbtz/zstd-seekable-format-go)
+- [ ] Implement optional separate index file to speedup store initialization
