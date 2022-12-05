@@ -35,13 +35,13 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("ошибка при открытии файла для записи: %v", err)
+		return nil, fmt.Errorf("open store file: %v", err)
 	}
 
 	compressor, err := zstd.NewWriter(f)
 	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("ошибка при инициализации компрессора: %v", err)
+		return nil, fmt.Errorf("compressor initialization: %v", err)
 	}
 
 	database := &Store{
@@ -59,14 +59,14 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 	readF, err := os.Open(filePath)
 	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("ошибка при открытии файла для чтения: %v", err)
+		return nil, fmt.Errorf("open file for indexing: %v", err)
 	}
 	defer readF.Close()
 
 	decompressor, err := zstd.NewReader(readF)
 	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("ошибка при инициализации декомпрессора: %v", err)
+		return nil, fmt.Errorf("decompressor initialization: %v", err)
 	}
 	defer decompressor.Close()
 
@@ -78,7 +78,7 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 		}
 		if err != nil {
 			f.Close()
-			return nil, fmt.Errorf("ошибка при чтении записи из файла: %v", err)
+			return nil, fmt.Errorf("read record error: %v", err)
 		}
 
 		switch record.Type {
