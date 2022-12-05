@@ -2,6 +2,7 @@ package zkv
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -157,6 +158,43 @@ func (s *Store) Flush() error {
 	return s.flush()
 }
 
+func (s *Store) BackupWithOptions(filePath string, newFileOptions Options) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := s.flush()
+	if err != nil {
+		return err
+	}
+
+	newStore, err := OpenWithOptions(filePath, newFileOptions)
+	if err != nil {
+		return err
+	}
+
+	for keyHashStr := range s.dataOffset {
+		var keyHash [sha256.Size224]byte
+		copy(keyHash[:], keyHashStr)
+
+		valueBytes, err := s.getGobBytes(keyHash)
+		if err != nil {
+			newStore.Close()
+			return err
+		}
+		err = newStore.setBytes(keyHash, valueBytes)
+		if err != nil {
+			newStore.Close()
+			return err
+		}
+	}
+
+	return newStore.Close()
+}
+
+func (s *Store) Backup(filePath string) error {
+	return s.BackupWithOptions(filePath, defaultOptions)
+}
+
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -172,6 +210,35 @@ func (s *Store) Close() error {
 	}
 
 	return s.file.Close()
+}
+
+func (s *Store) setBytes(keyHash [sha256.Size224]byte, valueBytes []byte) error {
+	record, err := newRecordBytes(RecordTypeSet, keyHash, valueBytes)
+	if err != nil {
+		return err
+	}
+
+	b, err := record.Marshal()
+	if err != nil {
+		return err
+	}
+
+	s.bufferDataOffset[string(record.KeyHash[:])] = int64(s.buffer.Len())
+
+	_, err = s.buffer.Write(b)
+	if err != nil {
+		return err
+	}
+
+	if s.buffer.Len() > s.options.BufferSize {
+		err = s.flush()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Store) set(key, value interface{}) error {
@@ -201,6 +268,64 @@ func (s *Store) set(key, value interface{}) error {
 	}
 
 	return nil
+}
+
+func (s *Store) getGobBytes(keyHash [sha256.Size224]byte) ([]byte, error) {
+	s.readOrderChan <- struct{}{}
+	defer func() { <-s.readOrderChan }()
+
+	offset, exists := s.bufferDataOffset[string(keyHash[:])]
+	if exists {
+		reader := bytes.NewReader(s.buffer.Bytes())
+
+		err := skip(reader, offset)
+		if err != nil {
+			return nil, err
+		}
+
+		_, record, err := readRecord(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		return record.ValueBytes, nil
+	}
+
+	offset, exists = s.dataOffset[string(keyHash[:])]
+	if !exists {
+		return nil, ErrNotExists
+	}
+
+	readF, err := os.Open(s.filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer readF.Close()
+
+	decompressor, err := zstd.NewReader(readF)
+	if err != nil {
+		return nil, err
+	}
+	defer decompressor.Close()
+
+	err = skip(decompressor, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	_, record, err := readRecord(decompressor)
+	if err != nil {
+		return nil, err
+	}
+
+	if !bytes.Equal(record.KeyHash[:], keyHash[:]) {
+		expectedHashStr := base64.StdEncoding.EncodeToString(keyHash[:])
+		gotHashStr := base64.StdEncoding.EncodeToString(record.KeyHash[:])
+		return nil, fmt.Errorf("wrong hash of offset %d: expected %s, got %s", offset, expectedHashStr, gotHashStr)
+	}
+
+	return record.ValueBytes, nil
+
 }
 
 func (s *Store) get(key, value interface{}) error {
@@ -257,7 +382,9 @@ func (s *Store) get(key, value interface{}) error {
 	}
 
 	if !bytes.Equal(record.KeyHash[:], hashToFind[:]) {
-		return fmt.Errorf("wrong hash on this offset: expected %s, got %s", base64.StdEncoding.EncodeToString(hashToFind[:]), base64.StdEncoding.EncodeToString(record.KeyHash[:])) // TODO: заменить на константную ошибку
+		expectedHashStr := base64.StdEncoding.EncodeToString(hashToFind[:])
+		gotHashStr := base64.StdEncoding.EncodeToString(record.KeyHash[:])
+		return fmt.Errorf("wrong hash of offset %d: expected %s, got %s", offset, expectedHashStr, gotHashStr)
 	}
 
 	return decode(record.ValueBytes, value)

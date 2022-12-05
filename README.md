@@ -42,6 +42,9 @@ Other methods:
 ```go
 // Flush data to disk
 err = db.Flush()
+
+// Backup data to another file
+err = db.Backup("new/file/path")
 ```
 
 ## File structure
@@ -63,6 +66,6 @@ File is log stuctured list of commands:
 
 ## TODO
 
-- [ ] Implement `Copy()` method to copy store without deleted records
+- [ ] Add delete records test for `Backup()` method
 - [ ] Test [seekable zstd streams](https://github.com/SaveTheRbtz/zstd-seekable-format-go)
 - [ ] Implement optional separate index file to speedup store initialization

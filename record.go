@@ -2,6 +2,7 @@ package zkv
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
 	"io"
@@ -20,8 +21,17 @@ type Record struct {
 	ValueBytes []byte
 }
 
+func newRecordBytes(recordType RecordType, keyHash [sha256.Size224]byte, valueBytes []byte) (*Record, error) {
+	record := &Record{
+		Type:       recordType,
+		KeyHash:    keyHash,
+		ValueBytes: valueBytes}
+
+	return record, nil
+}
+
 func newRecord(recordType RecordType, key, value interface{}) (*Record, error) {
-	keyBytes, err := encode(key)
+	keyHash, err := hashInterface(key)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +41,7 @@ func newRecord(recordType RecordType, key, value interface{}) (*Record, error) {
 		return nil, err
 	}
 
-	record := &Record{
-		Type:       recordType,
-		KeyHash:    hashBytes(keyBytes),
-		ValueBytes: valueBytes}
-
-	return record, nil
+	return newRecordBytes(recordType, keyHash, valueBytes)
 }
 
 func (r *Record) Marshal() ([]byte, error) {
