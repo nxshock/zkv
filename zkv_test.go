@@ -274,3 +274,58 @@ func TestBackupBasic(t *testing.T) {
 	assert.NoError(t, err)
 
 }
+
+func TestBackupWithDeletedRecords(t *testing.T) {
+	const filePath = "TestBackupWithDeletedRecords.zkv"
+	const newFilePath = "TestBackupWithDeletedRecords2.zkv"
+	const recordCount = 100
+	defer os.Remove(filePath)
+	defer os.Remove(newFilePath)
+
+	db, err := Open(filePath)
+	assert.NoError(t, err)
+
+	for i := 1; i <= recordCount; i++ {
+		err = db.Set(i, i)
+		assert.NoError(t, err)
+	}
+
+	err = db.Flush()
+	assert.NoError(t, err)
+
+	for i := 1; i <= recordCount; i++ {
+		if i%2 == 1 {
+			continue
+		}
+
+		err = db.Delete(i)
+		assert.NoError(t, err)
+	}
+
+	err = db.Backup(newFilePath)
+	assert.NoError(t, err)
+
+	err = db.Close()
+	assert.NoError(t, err)
+
+	db, err = Open(newFilePath)
+	assert.NoError(t, err)
+
+	assert.Len(t, db.dataOffset, recordCount/2)
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		if i%2 == 0 {
+			assert.ErrorIs(t, err, ErrNotExists)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, i, gotValue)
+		}
+	}
+
+	err = db.Close()
+	assert.NoError(t, err)
+
+}
