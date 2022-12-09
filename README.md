@@ -20,7 +20,7 @@ Simple key-value store for single-user applications.
 Create or open existing file:
 
 ```go
-db, err := Open("path to file")
+db, err := zkv.Open("path to file")
 ```
 
 Data operations:
