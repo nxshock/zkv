@@ -66,6 +66,5 @@ File is log stuctured list of commands:
 
 ## TODO
 
-- [ ] Test [seekable zstd streams](https://github.com/SaveTheRbtz/zstd-seekable-format-go)
 - [ ] Implement optional separate index file to speedup store initialization
 - [ ] Add recovery previous state of store file on write error
