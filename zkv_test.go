@@ -165,7 +165,7 @@ func TestBufferBasic(t *testing.T) {
 	const filePath = "TestBuffer.zkv"
 	defer os.Remove(filePath)
 
-	db, err := OpenWithOptions(filePath, Options{BufferSize: 100})
+	db, err := OpenWithOptions(filePath, Options{MemoryBufferSize: 100})
 	assert.NoError(t, err)
 
 	err = db.Set(1, make([]byte, 100))
@@ -190,7 +190,7 @@ func TestBufferRead(t *testing.T) {
 	const recordCount = 100
 	defer os.Remove(filePath)
 
-	db, err := OpenWithOptions(filePath, Options{BufferSize: 100})
+	db, err := OpenWithOptions(filePath, Options{MemoryBufferSize: 100})
 	assert.NoError(t, err)
 
 	for i := 1; i <= recordCount; i++ {

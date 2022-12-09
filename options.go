@@ -9,8 +9,11 @@ type Options struct {
 	// Compression level
 	CompressionLevel zstd.EncoderLevel
 
-	// Write buffer size in bytes
-	BufferSize int
+	// Memory write buffer size in bytes
+	MemoryBufferSize int
+
+	// Diwk write buffer size in bytes
+	DiskBufferSize int
 }
 
 func (o *Options) setDefaults() {

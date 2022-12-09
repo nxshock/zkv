@@ -1,6 +1,7 @@
 package zkv
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
@@ -124,7 +125,7 @@ func (s *Store) Delete(key interface{}) error {
 		return err
 	}
 
-	if s.buffer.Len() > s.options.BufferSize {
+	if s.buffer.Len() > s.options.MemoryBufferSize {
 		err = s.flush()
 
 		if err != nil {
@@ -209,7 +210,7 @@ func (s *Store) setBytes(keyHash [sha256.Size224]byte, valueBytes []byte) error 
 		return err
 	}
 
-	if s.buffer.Len() > s.options.BufferSize {
+	if s.buffer.Len() > s.options.MemoryBufferSize {
 		err = s.flush()
 
 		if err != nil {
@@ -238,7 +239,7 @@ func (s *Store) set(key, value interface{}) error {
 		return err
 	}
 
-	if s.buffer.Len() > s.options.BufferSize {
+	if s.buffer.Len() > s.options.MemoryBufferSize {
 		err = s.flush()
 
 		if err != nil {
@@ -377,7 +378,9 @@ func (s *Store) flush() error {
 		return fmt.Errorf("open store file: %v", err)
 	}
 
-	encoder, err := zstd.NewWriter(f, zstd.WithEncoderLevel(s.options.CompressionLevel))
+	diskWriteBuffer := bufio.NewWriterSize(f, s.options.DiskBufferSize)
+
+	encoder, err := zstd.NewWriter(diskWriteBuffer, zstd.WithEncoderLevel(s.options.CompressionLevel))
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("open store file: %v", err)
@@ -397,6 +400,12 @@ func (s *Store) flush() error {
 	s.offset += l
 
 	err = encoder.Close()
+	if err != nil {
+		// TODO: truncate file to previous state
+		return err
+	}
+
+	err = diskWriteBuffer.Flush()
 	if err != nil {
 		// TODO: truncate file to previous state
 		return err

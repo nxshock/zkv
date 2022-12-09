@@ -9,5 +9,6 @@ import (
 var defaultOptions = Options{
 	MaxParallelReads: runtime.NumCPU(),
 	CompressionLevel: zstd.SpeedDefault,
-	BufferSize:       4 * 1024 * 1024,
+	MemoryBufferSize: 4 * 1024 * 1024,
+	DiskBufferSize:   1 * 1024 * 1024,
 }
