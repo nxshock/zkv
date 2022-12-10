@@ -86,6 +86,13 @@ File is log stuctured list of commands:
 | Length | Record body bytes length | int64    |
 | Body   | Gob-encoded record       | variable |
 
+## Resource consumption
+
+Store requirements:
+
+* around 300 Mb of RAM per 1 million of keys
+* around 34 Mb of disk space for index file per 1 million of keys
+
 ## TODO
 
 - [ ] Add recovery previous state of store file on write error
