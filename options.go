@@ -12,7 +12,7 @@ type Options struct {
 	// Memory write buffer size in bytes
 	MemoryBufferSize int
 
-	// Diwk write buffer size in bytes
+	// Disk write buffer size in bytes
 	DiskBufferSize int
 }
 
