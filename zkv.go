@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -40,6 +41,16 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 		filePath:         filePath,
 		options:          options,
 		readOrderChan:    make(chan struct{}, int(options.MaxParallelReads))}
+
+	if options.UseIndexFile {
+		idxFile, err := os.Open(filePath + indexFileExt)
+		if err == nil {
+			err = gob.NewDecoder(idxFile).Decode(&database.dataOffset)
+			if err == nil {
+				return database, nil
+			}
+		}
+	}
 
 	// restore file data
 	readF, err := os.Open(filePath)
@@ -81,7 +92,8 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 }
 
 func Open(filePath string) (*Store, error) {
-	return OpenWithOptions(filePath, defaultOptions)
+	options := defaultOptions
+	return OpenWithOptions(filePath, options)
 }
 
 func (s *Store) Set(key, value interface{}) error {
@@ -414,6 +426,21 @@ func (s *Store) flush() error {
 	err = f.Close()
 	if err != nil {
 		return err
+	}
+
+	// Update index file only on data update
+	if s.options.UseIndexFile && l > 0 {
+		idxBuf := new(bytes.Buffer)
+
+		err = gob.NewEncoder(idxBuf).Encode(s.dataOffset)
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(s.filePath+indexFileExt, idxBuf.Bytes(), 0644)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

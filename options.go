@@ -14,6 +14,9 @@ type Options struct {
 
 	// Disk write buffer size in bytes
 	DiskBufferSize int
+
+	// Use index file
+	UseIndexFile bool
 }
 
 func (o *Options) setDefaults() {
@@ -23,5 +26,13 @@ func (o *Options) setDefaults() {
 
 	if o.CompressionLevel == 0 {
 		o.CompressionLevel = defaultOptions.CompressionLevel
+	}
+
+	if o.MemoryBufferSize == 0 {
+		o.MemoryBufferSize = defaultOptions.MemoryBufferSize
+	}
+
+	if o.DiskBufferSize == 0 {
+		o.DiskBufferSize = defaultOptions.DiskBufferSize
 	}
 }

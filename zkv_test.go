@@ -327,5 +327,50 @@ func TestBackupWithDeletedRecords(t *testing.T) {
 
 	err = db.Close()
 	assert.NoError(t, err)
+}
 
+func TestIndexFileBasic(t *testing.T) {
+	const filePath = "TestReadWriteBasic.zkv"
+	const recordCount = 100
+	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
+
+	db, err := OpenWithOptions(filePath, Options{UseIndexFile: true})
+	assert.NoError(t, err)
+
+	for i := 1; i <= recordCount; i++ {
+		err = db.Set(i, i)
+		assert.NoError(t, err)
+	}
+
+	assert.Len(t, db.dataOffset, 0)
+	assert.Len(t, db.bufferDataOffset, recordCount)
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
+
+	err = db.Close()
+	assert.NoError(t, err)
+
+	// try to read
+	db, err = OpenWithOptions(filePath, Options{UseIndexFile: true})
+	assert.NoError(t, err)
+
+	assert.Len(t, db.dataOffset, recordCount)
+
+	for i := 1; i <= recordCount; i++ {
+		var gotValue int
+
+		err = db.Get(i, &gotValue)
+		assert.NoError(t, err)
+		assert.Equal(t, i, gotValue)
+	}
+
+	err = db.Close()
+	assert.NoError(t, err)
 }

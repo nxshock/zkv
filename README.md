@@ -11,7 +11,7 @@ Simple key-value store for single-user applications.
 ## Cons
 
 * Index stored in memory (`map[key hash (28 bytes)]file offset (int64)`) - average 200-250 Mb of RAM per 1M keys
-* Need to read the whole file on store open to create file index
+* Need to read the whole file on store open to create file index (you can use index file options to avoid this)
 * No way to recover disk space from deleted records
 * Write/Delete operations block Read and each other operations
 
@@ -47,6 +47,28 @@ err = db.Flush()
 err = db.Backup("new/file/path")
 ```
 
+## Store options
+
+```go
+type Options struct {
+	// Maximum number of concurrent reads
+	MaxParallelReads int
+
+	// Compression level
+	CompressionLevel zstd.EncoderLevel
+
+	// Memory write buffer size in bytes
+	MemoryBufferSize int
+
+	// Disk write buffer size in bytes
+	DiskBufferSize int
+
+	// Use index file
+	UseIndexFile bool
+}
+
+```
+
 ## File structure
 
 Record is `encoding/gob` structure:
@@ -66,5 +88,4 @@ File is log stuctured list of commands:
 
 ## TODO
 
-- [ ] Implement optional separate index file to speedup store initialization
 - [ ] Add recovery previous state of store file on write error
