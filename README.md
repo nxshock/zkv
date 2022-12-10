@@ -10,10 +10,11 @@ Simple key-value store for single-user applications.
 
 ## Cons
 
-* Index stored in memory (`map[key hash (28 bytes)]file offset (int64)`) - average 200-250 Mb of RAM per 1M keys
+* Index stored in memory (`map[key hash (28 bytes)]file offset (int64)`)
 * Need to read the whole file on store open to create file index (you can use index file options to avoid this)
 * No way to recover disk space from deleted records
 * Write/Delete operations block Read and each other operations
+* Need to decode whole file until stored value
 
 ## Usage
 
@@ -96,3 +97,4 @@ Store requirements:
 ## TODO
 
 - [ ] Add recovery previous state of store file on write error
+- [ ] Add fast file seek to value (add compressed block start position)
