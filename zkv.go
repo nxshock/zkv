@@ -329,57 +329,12 @@ func (s *Store) get(key, value interface{}) error {
 		return err
 	}
 
-	offset, exists := s.bufferDataOffset[string(hashToFind[:])]
-	if exists {
-		reader := bytes.NewReader(s.buffer.Bytes())
-
-		err = skip(reader, offset)
-		if err != nil {
-			return err
-		}
-
-		_, record, err := readRecord(reader)
-		if err != nil {
-			return err
-		}
-
-		return decode(record.ValueBytes, value)
-	}
-
-	offset, exists = s.dataOffset[string(hashToFind[:])]
-	if !exists {
-		return ErrNotExists
-	}
-
-	readF, err := os.Open(s.filePath)
-	if err != nil {
-		return err
-	}
-	defer readF.Close()
-
-	decompressor, err := zstd.NewReader(readF)
-	if err != nil {
-		return err
-	}
-	defer decompressor.Close()
-
-	err = skip(decompressor, offset)
+	b, err := s.getGobBytes(hashToFind)
 	if err != nil {
 		return err
 	}
 
-	_, record, err := readRecord(decompressor)
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(record.KeyHash[:], hashToFind[:]) {
-		expectedHashStr := base64.StdEncoding.EncodeToString(hashToFind[:])
-		gotHashStr := base64.StdEncoding.EncodeToString(record.KeyHash[:])
-		return fmt.Errorf("wrong hash of offset %d: expected %s, got %s", offset, expectedHashStr, gotHashStr)
-	}
-
-	return decode(record.ValueBytes, value)
+	return decode(b, value)
 }
 
 func (s *Store) flush() error {
