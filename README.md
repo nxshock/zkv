@@ -4,17 +4,17 @@ Simple key-value store for single-user applications.
 
 ## Pros
 
-* Simple one file structure
+* Simple two file structure (data file and index file)
 * Internal Zstandard compression by [klauspost/compress/zstd](https://github.com/klauspost/compress/tree/master/zstd)
 * Threadsafe operations through `sync.RWMutex`
 
 ## Cons
 
 * Index stored in memory (`map[key hash (28 bytes)]file offset (int64)`)
-* Need to read the whole file on store open to create file index (you can use index file options to avoid this)
+* No transaction system
+* Index file is fully rewrited on every store commit
 * No way to recover disk space from deleted records
 * Write/Delete operations block Read and each other operations
-* Need to decode whole file until stored value
 
 ## Usage
 
@@ -63,9 +63,6 @@ type Options struct {
 
 	// Disk write buffer size in bytes
 	DiskBufferSize int
-
-	// Use index file
-	UseIndexFile bool
 }
 
 ```
@@ -87,6 +84,17 @@ File is log stuctured list of commands:
 | Length | Record body bytes length | int64    |
 | Body   | Gob-encoded record       | variable |
 
+Index file is simple gob-encoded map:
+
+```go
+map[string]struct {
+	BlockOffset  int64
+	RecordOffset int64
+}
+```
+
+where map key is data key hash and value - data offset in data file.
+
 ## Resource consumption
 
 Store requirements:
@@ -97,4 +105,4 @@ Store requirements:
 ## TODO
 
 - [ ] Add recovery previous state of store file on write error
-- [ ] Add fast file seek to value (add compressed block start position)
+- [ ] Add method for index rebuild
