@@ -11,7 +11,7 @@ var defaultOptions = Options{
 	CompressionLevel: zstd.SpeedDefault,
 	MemoryBufferSize: 4 * 1024 * 1024,
 	DiskBufferSize:   1 * 1024 * 1024,
-	UseIndexFile:     false,
+	useIndexFile:     true,
 }
 
 const indexFileExt = ".idx"

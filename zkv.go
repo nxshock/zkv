@@ -14,11 +14,15 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
+type Offsets struct {
+	BlockOffset  int64
+	RecordOffset int64
+}
+
 type Store struct {
-	dataOffset map[string]int64
+	dataOffset map[string]Offsets
 
 	filePath string
-	offset   int64
 
 	buffer           *bytes.Buffer
 	bufferDataOffset map[string]int64
@@ -34,15 +38,14 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 	options.setDefaults()
 
 	database := &Store{
-		dataOffset:       make(map[string]int64),
+		dataOffset:       make(map[string]Offsets),
 		bufferDataOffset: make(map[string]int64),
-		offset:           0,
 		buffer:           new(bytes.Buffer),
 		filePath:         filePath,
 		options:          options,
 		readOrderChan:    make(chan struct{}, int(options.MaxParallelReads))}
 
-	if options.UseIndexFile {
+	if options.useIndexFile {
 		idxFile, err := os.Open(filePath + indexFileExt)
 		if err == nil {
 			err = gob.NewDecoder(idxFile).Decode(&database.dataOffset)
@@ -80,7 +83,7 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 
 		switch record.Type {
 		case RecordTypeSet:
-			database.dataOffset[string(record.KeyHash[:])] = offset
+			database.dataOffset[string(record.KeyHash[:])] = Offsets{} // offset
 		case RecordTypeDelete:
 			delete(database.dataOffset, string(record.KeyHash[:]))
 		}
@@ -283,7 +286,7 @@ func (s *Store) getGobBytes(keyHash [sha256.Size224]byte) ([]byte, error) {
 		return record.ValueBytes, nil
 	}
 
-	offset, exists = s.dataOffset[string(keyHash[:])]
+	offsets, exists := s.dataOffset[string(keyHash[:])]
 	if !exists {
 		return nil, ErrNotExists
 	}
@@ -294,13 +297,18 @@ func (s *Store) getGobBytes(keyHash [sha256.Size224]byte) ([]byte, error) {
 	}
 	defer readF.Close()
 
+	_, err = readF.Seek(offsets.BlockOffset, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
 	decompressor, err := zstd.NewReader(readF)
 	if err != nil {
 		return nil, err
 	}
 	defer decompressor.Close()
 
-	err = skip(decompressor, offset)
+	err = skip(decompressor, offsets.RecordOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +325,6 @@ func (s *Store) getGobBytes(keyHash [sha256.Size224]byte) ([]byte, error) {
 	}
 
 	return record.ValueBytes, nil
-
 }
 
 func (s *Store) get(key, value interface{}) error {
@@ -344,13 +351,18 @@ func (s *Store) flush() error {
 	if err != nil {
 		return fmt.Errorf("open store file: %v", err)
 	}
+	stat, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return fmt.Errorf("stat store file: %v", err)
+	}
 
 	diskWriteBuffer := bufio.NewWriterSize(f, s.options.DiskBufferSize)
 
 	encoder, err := zstd.NewWriter(diskWriteBuffer, zstd.WithEncoderLevel(s.options.CompressionLevel))
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("open store file: %v", err)
+		return fmt.Errorf("init encoder: %v", err)
 	}
 
 	_, err = s.buffer.WriteTo(encoder)
@@ -359,12 +371,10 @@ func (s *Store) flush() error {
 	}
 
 	for key, val := range s.bufferDataOffset {
-		s.dataOffset[key] = val + s.offset
+		s.dataOffset[key] = Offsets{BlockOffset: stat.Size(), RecordOffset: val}
 	}
 
 	s.bufferDataOffset = make(map[string]int64)
-
-	s.offset += l
 
 	err = encoder.Close()
 	if err != nil {
@@ -384,7 +394,7 @@ func (s *Store) flush() error {
 	}
 
 	// Update index file only on data update
-	if s.options.UseIndexFile && l > 0 {
+	if s.options.useIndexFile && l > 0 {
 		idxBuf := new(bytes.Buffer)
 
 		err = gob.NewEncoder(idxBuf).Encode(s.dataOffset)

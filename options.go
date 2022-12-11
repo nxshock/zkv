@@ -16,10 +16,12 @@ type Options struct {
 	DiskBufferSize int
 
 	// Use index file
-	UseIndexFile bool
+	useIndexFile bool
 }
 
 func (o *Options) setDefaults() {
+	o.useIndexFile = true // TODO: implement database search without index
+
 	if o.MaxParallelReads == 0 {
 		o.MaxParallelReads = defaultOptions.MaxParallelReads
 	}

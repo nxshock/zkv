@@ -39,6 +39,7 @@ func TestReadWriteBasic(t *testing.T) {
 	const filePath = "TestReadWriteBasic.zkv"
 	const recordCount = 100
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 
 	db, err := Open(filePath)
 	assert.NoError(t, err)
@@ -84,6 +85,7 @@ func TestSmallWrites(t *testing.T) {
 	const filePath = "TestSmallWrites.zkv"
 	const recordCount = 100
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 
 	for i := 1; i <= recordCount; i++ {
 		db, err := Open(filePath)
@@ -119,6 +121,7 @@ func TestDeleteBasic(t *testing.T) {
 	const filePath = "TestDeleteBasic.zkv"
 	const recordCount = 100
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 
 	db, err := Open(filePath)
 	assert.NoError(t, err)
@@ -164,6 +167,7 @@ func TestDeleteBasic(t *testing.T) {
 func TestBufferBasic(t *testing.T) {
 	const filePath = "TestBuffer.zkv"
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 
 	db, err := OpenWithOptions(filePath, Options{MemoryBufferSize: 100})
 	assert.NoError(t, err)
@@ -187,8 +191,9 @@ func TestBufferBasic(t *testing.T) {
 
 func TestBufferRead(t *testing.T) {
 	const filePath = "TestBufferRead.zkv"
-	const recordCount = 100
+	const recordCount = 2
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 
 	db, err := OpenWithOptions(filePath, Options{MemoryBufferSize: 100})
 	assert.NoError(t, err)
@@ -241,7 +246,9 @@ func TestBackupBasic(t *testing.T) {
 	const newFilePath = "TestBackupBasic2.zkv"
 	const recordCount = 100
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 	defer os.Remove(newFilePath)
+	defer os.Remove(newFilePath + indexFileExt)
 
 	db, err := Open(filePath)
 	assert.NoError(t, err)
@@ -280,7 +287,9 @@ func TestBackupWithDeletedRecords(t *testing.T) {
 	const newFilePath = "TestBackupWithDeletedRecords2.zkv"
 	const recordCount = 100
 	defer os.Remove(filePath)
+	defer os.Remove(filePath + indexFileExt)
 	defer os.Remove(newFilePath)
+	defer os.Remove(newFilePath + indexFileExt)
 
 	db, err := Open(filePath)
 	assert.NoError(t, err)
@@ -335,7 +344,7 @@ func TestIndexFileBasic(t *testing.T) {
 	defer os.Remove(filePath)
 	defer os.Remove(filePath + indexFileExt)
 
-	db, err := OpenWithOptions(filePath, Options{UseIndexFile: true})
+	db, err := Open(filePath)
 	assert.NoError(t, err)
 
 	for i := 1; i <= recordCount; i++ {
@@ -358,7 +367,7 @@ func TestIndexFileBasic(t *testing.T) {
 	assert.NoError(t, err)
 
 	// try to read
-	db, err = OpenWithOptions(filePath, Options{UseIndexFile: true})
+	db, err = Open(filePath)
 	assert.NoError(t, err)
 
 	assert.Len(t, db.dataOffset, recordCount)
