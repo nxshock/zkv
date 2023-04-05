@@ -3,8 +3,8 @@ module github.com/nxshock/zkv
 go 1.19
 
 require (
-	github.com/klauspost/compress v1.15.12
-	github.com/stretchr/testify v1.8.1
+	github.com/klauspost/compress v1.16.4
+	github.com/stretchr/testify v1.8.2
 )
 
 require (
