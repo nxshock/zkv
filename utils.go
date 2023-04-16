@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"errors"
 	"io"
+	"os"
 )
 
 func encode(value interface{}) ([]byte, error) {
@@ -39,4 +41,14 @@ func skip(r io.Reader, count int64) (err error) {
 	}
 
 	return err
+}
+
+func isFileExists(filePath string) (bool, error) {
+	if _, err := os.Stat(filePath); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }

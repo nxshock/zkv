@@ -37,7 +37,7 @@ type Store struct {
 func OpenWithOptions(filePath string, options Options) (*Store, error) {
 	options.setDefaults()
 
-	database := &Store{
+	store := &Store{
 		dataOffset:       make(map[string]Offsets),
 		bufferDataOffset: make(map[string]int64),
 		buffer:           new(bytes.Buffer),
@@ -48,50 +48,30 @@ func OpenWithOptions(filePath string, options Options) (*Store, error) {
 	if options.useIndexFile {
 		idxFile, err := os.Open(filePath + indexFileExt)
 		if err == nil {
-			err = gob.NewDecoder(idxFile).Decode(&database.dataOffset)
-			if err == nil {
-				return database, nil
+			err = gob.NewDecoder(idxFile).Decode(&store.dataOffset)
+			if err != nil {
+				return nil, err
 			}
+
+			return store, nil
 		}
 	}
 
-	// restore file data
-	readF, err := os.Open(filePath)
-	if os.IsNotExist(err) {
-		// Empty datebase
-		return database, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("open file for indexing: %v", err)
-	}
-	defer readF.Close()
-
-	decompressor, err := zstd.NewReader(readF)
+	exists, err := isFileExists(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("decompressor initialization: %v", err)
-	}
-	defer decompressor.Close()
-
-	offset := int64(0)
-	for {
-		n, record, err := readRecord(decompressor)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read record error: %v", err)
-		}
-
-		switch record.Type {
-		case RecordTypeSet:
-			database.dataOffset[string(record.KeyHash[:])] = Offsets{} // offset
-		case RecordTypeDelete:
-			delete(database.dataOffset, string(record.KeyHash[:]))
-		}
-
-		offset += n
+		return nil, err
 	}
 
-	return database, nil
+	if !exists {
+		return store, nil
+	}
+
+	err = store.rebuildIndex()
+	if err != nil {
+		return nil, err
+	}
+
+	return store, nil
 }
 
 func Open(filePath string) (*Store, error) {
@@ -395,18 +375,134 @@ func (s *Store) flush() error {
 
 	// Update index file only on data update
 	if s.options.useIndexFile && l > 0 {
-		idxBuf := new(bytes.Buffer)
-
-		err = gob.NewEncoder(idxBuf).Encode(s.dataOffset)
-		if err != nil {
-			return err
-		}
-
-		err = os.WriteFile(s.filePath+indexFileExt, idxBuf.Bytes(), 0644)
+		err = s.saveIndex()
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func readBlock(r *bufio.Reader) (line []byte, n int, err error) {
+	delim := []byte{0x28, 0xb5, 0x2f, 0xfd}
+
+	line = make([]byte, len(delim))
+	copy(line, delim)
+
+	for {
+		s, err := r.ReadBytes(delim[len(delim)-1])
+		line = append(line, []byte(s)...)
+		if err != nil {
+			if bytes.Equal(line, delim) { // contains only magic number
+				return []byte{}, 0, err
+			} else {
+				return line, len(s), err
+			}
+		}
+
+		if bytes.Equal(line, append(delim, delim...)) { // first block
+			line = make([]byte, len(delim))
+			copy(line, delim)
+			continue
+		}
+
+		if bytes.HasSuffix(line, delim) {
+			return line[:len(line)-len(delim)], len(s), nil
+		}
+	}
+}
+
+// RebuildIndex renews index from store file
+func (s *Store) RebuildIndex() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := s.rebuildIndex()
+	if err != nil {
+		return err
+	}
+
+	if s.options.useIndexFile {
+		return s.saveIndex()
+	}
+
+	return nil
+}
+
+func (s *Store) rebuildIndex() error {
+	f, err := os.Open(s.filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	r := bufio.NewReader(f)
+
+	var blockOffset int64
+
+	s.dataOffset = make(map[string]Offsets)
+
+	for {
+		l, n, err := readBlock(r)
+		if err != nil {
+			if err != io.EOF {
+				return err
+			} else if err == io.EOF && len(l) == 0 {
+				break
+			}
+		}
+
+		dec, err := zstd.NewReader(bytes.NewReader(l))
+
+		var recordOffset int64
+		for {
+			n, record, err := readRecord(dec)
+			if err != nil {
+				if err == io.EOF {
+					break
+				} else {
+					return err
+				}
+			}
+
+			switch record.Type {
+			case RecordTypeSet:
+				s.dataOffset[string(record.KeyHash[:])] = Offsets{BlockOffset: blockOffset, RecordOffset: recordOffset}
+			case RecordTypeDelete:
+				delete(s.dataOffset, string(record.KeyHash[:]))
+			}
+			recordOffset += n
+		}
+
+		blockOffset += int64(n)
+	}
+
+	idxBuf := new(bytes.Buffer)
+
+	err = gob.NewEncoder(idxBuf).Encode(s.dataOffset)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(s.filePath+indexFileExt, idxBuf.Bytes(), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) saveIndex() error {
+	f, err := os.OpenFile(s.filePath+indexFileExt, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+
+	err = gob.NewEncoder(f).Encode(s.dataOffset)
+	if err != nil {
+		return err
+	}
+
+	return f.Close()
 }
